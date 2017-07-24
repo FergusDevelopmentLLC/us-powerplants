@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8 />
+    <title>Power Plants of the United States: Coal, Hydro and Solar</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css" />
+    <link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: whitesmoke;
+            font-family: Lato, sans-serif;
+            color: #0D0000;
+        }
+        header {
+            padding: 6px 10%;
+        }
+        h1 {
+            display: inline-block;
+            margin-right: 20px;
+            color: #001323;
+        }
+        h2 {
+            display: inline-block;
+            color: #001323;
+        }
+        #map {
+            width: 80%;
+            height: 540px;
+            margin: 10px auto;
+        }
+        footer {
+            padding: 6px 10%;
+            width: 80%;
+        }
+        p {
+            font-size: 1em;
+            color: #001323;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Power Plants of the United States</h1>
+        <h2>Coal, Hydro and Solar</h2>
+    </header>
+
+    <div id='map'></div>
+
+    <footer>
+        <p>Map authored by Will Carter, June 2017</p>
+        <p>Data source(s): U.S. Department of Energy (<a href='http://www.eia.gov/electricity/data/eia923/'>http://www.eia.gov/electricity/data/eia923/</a>).</p>
+    </footer>
+    <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"></script>
+    <script src="data/power-plants.js"></script>
+    <script>
+
+      var map = L.map('map', {
+          center: [36,-94],
+          zoom: 4,
+      });
+
+      var tiles = L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+          subdomains: 'abcd',
+          maxZoom: 19
+      });
+
+      tiles.addTo(map);
+
+      // define common styles across all plants
+      var commonStyles = {
+        weight: 1,
+        stroke: 1,
+        fillOpacity: .5
+      }
+
+      // define an array of plant types (fuel source) to display along with a distict color for each type
+      var plant_types_to_display =
+      [
+        {
+          fuel_source: "Coal",
+          fillColor: "#C0C0C0",
+          color: "#808080"
+        },
+        {
+          fuel_source: "Hydro",
+          fillColor: "#00bfff",
+          color: "#0040ff"
+        },
+        {
+          fuel_source: "Solar",
+          fillColor: "#FFFF00",
+          color: "#F1C40F"
+        }
+      ];
+
+      // sort the plant by capacity so that large ones get put on map first
+      plants.features.sort(function(a, b) {
+        return b.properties.capacity_mw - a.properties.capacity_mw;
+      });
+
+      // loop thru plant_types_to_display, displaying plants by type (fuel source)
+      plant_types_to_display.forEach(function(plant) {
+        //console.log(plant);
+        var hydroLayer = L.geoJson(plants, {
+          pointToLayer: function(feature,latlng) {
+            return L.circleMarker(latlng, commonStyles);
+          },
+          filter: function(feature) {
+            // looking for a string like: feature['properties']['fuel_source'][Hydro]
+            if(feature['properties']['fuel_source'][plant.fuel_source]) {
+              return feature;
+            }
+          },
+          style: function(feature) {
+            return {
+              color: plant.color,
+              fillColor: plant.fillColor,
+              radius: getRadius(feature['properties']['fuel_source'][plant.fuel_source])
+            }
+          },
+          onEachFeature : function(feature,layer) {
+
+            tooltip_html = getToolTipHtml(feature, plant.fuel_source);
+            layer.bindTooltip(tooltip_html);
+
+            layer.on('mouseover', function() {
+              layer.setStyle({
+                fillColor: '#FF00FF',
+                color: '#FF00FF'
+              });
+            });
+
+            layer.on('mouseout', function() {
+              layer.setStyle({
+                fillColor: plant.fillColor,
+                color: plant.color
+              });
+            });
+
+          }
+        }).addTo(map)
+      });
+
+      // return tooltip html string for feature...
+      function getToolTipHtml(feature, type) {
+
+        var tooltip_html = "";
+
+        var break_line = "";
+
+        //feature geojson data, for example:
+        //{"code":6163,"plant_name":"Grand Coulee","capacity_mw":7079,"fuel_source":{"Hydro":6765,"Pumped Storage":314}}
+
+        if(feature.properties.plant_name){
+          tooltip_html += break_line + "<strong>" + feature.properties.plant_name + "</strong>";
+          break_line = "<br/>";
+        }
+
+        if(feature.properties.capacity_mw) {
+          tooltip_html += break_line + numberWithCommas(feature.properties.capacity_mw) + " MW";
+          break_line = "<br/>";
+        }
+
+        if(feature["properties"]["fuel_source"][type]) {
+          tooltip_html += break_line + "<strong>" + type + ":</strong> " + numberWithCommas(feature["properties"]["fuel_source"][type]) + " MW";
+          break_line = "<br/>";
+        }
+
+        if(feature["properties"]["fuel_source"]["Pumped Storage"]) {
+          tooltip_html += break_line + "<strong>Pumped Storage:</strong> " + numberWithCommas(feature["properties"]["fuel_source"]["Pumped Storage"]) + " MW";
+          break_line = "<br/>";
+        }
+
+        return tooltip_html;
+      }
+
+      //return circle radius based on the area
+      function getRadius(area) {
+        var radius = Math.sqrt(area/Math.PI);
+        return radius * .6;
+      }
+
+      function numberWithCommas(x) {
+        return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      }
+
+    </script>
+
+</body>
+</html>
